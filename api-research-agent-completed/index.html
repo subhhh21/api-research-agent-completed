@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>100 apps, researched by an agent</title>
+<style>
+:root{--bg:#fbfbf9;--fg:#1c2430;--mut:#5d6877;--line:#d9dde3;--acc:#0b5cad;--ok:#1b7a43;--bad:#b3261e;--warn:#9a6700}
+@media(prefers-color-scheme:dark){:root{--bg:#14181f;--fg:#e8ebf0;--mut:#9aa5b4;--line:#2d3542;--acc:#6db0ff;--ok:#5fd08a;--bad:#ff8a80;--warn:#e3b341}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif;padding:24px 16px}
+main{max-width:1100px;margin:auto}h1{font:700 2rem/1.2 Georgia,serif;margin:0 0 6px}h2{font:700 1.25rem Georgia,serif;margin:36px 0 10px}
+p,li{max-width:75ch}.mut{color:var(--mut)}.pat li{font-size:1.1rem;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.wrap{overflow-x:auto}.bar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}select,input{padding:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px}
+.t{font-weight:600}.yes,.self-serve{color:var(--ok)}.no,.gated{color:var(--bad)}.partial,.paid{color:var(--warn)}
+a{color:var(--acc)}code,pre{background:var(--line);padding:2px 5px;border-radius:3px}pre{padding:10px;overflow-x:auto}
+</style></head><body><main>
+<h1>100 apps, researched by an agent</h1>
+<p class="mut" id="sub">Can each app become an agent toolkit? Auth, access, API, MCP, blockers, with evidence and a measured accuracy check.</p>
+<div id="empty" hidden><h2>No results yet</h2><p>Run the pipeline, then reload:</p><pre>python pipeline.py pass1 &amp;&amp; python pipeline.py pass2
+python pipeline.py sample   # fill h_* columns by hand
+python pipeline.py analyze</pre></div>
+<div id="app" hidden>
+<h2>What the 100 apps show</h2><ul class="pat" id="pat"></ul>
+<p class="mut" id="lists"></p>
+<h2>All apps</h2>
+<div class="bar"><input id="q" placeholder="Search app" aria-label="Search app"><select id="fc" aria-label="Category"></select>
+<select id="fa" aria-label="Access"><option value="">Any access</option><option>self-serve</option><option>paid</option><option>gated</option></select>
+<select id="fv" aria-label="Verdict"><option value="">Any verdict</option><option>yes</option><option>partial</option><option>no</option></select></div>
+<div class="wrap"><table><thead><tr><th>App</th><th>Category</th><th>Auth</th><th>Access</th><th>API</th><th>MCP</th><th>Verdict</th><th>Blocker</th><th>Evidence</th><th>Conf.</th></tr></thead><tbody id="rows"></tbody></table></div>
+<h2>The agent</h2>
+<p>For each app, a research agent with web search reads the official docs and fills a fixed schema, citing the URLs it opened (<code>pass1</code>). A second verifier agent re-checks every field against the docs and corrects pricing/gating errors (<code>pass2</code>). Both passes are saved so you can compare them. Run one app live: <code>python pipeline.py one "Stripe"</code></p>
+<h2>Where a human was needed</h2><div id="notes" class="mut"></div>
+<h2>Verification</h2><div id="acc"></div><div id="miss"></div>
+</div>
+<script src="data.js"></script>
+<script>
+const D=window.DATA,$=id=>document.getElementById(id);
+if(!D){$("empty").hidden=false}else{$("app").hidden=false;
+$("sub").textContent+=` Model: ${D.meta.model}. Researched ${D.meta.ok} of ${D.meta.apps}; ${D.meta.failed} failed.`;
+D.patterns.forEach(p=>{const l=document.createElement("li");l.textContent=p;$("pat").append(l)});
+$("lists").textContent=`Easy wins: ${D.easy.join(", ")||"none"}. Needs outreach: ${D.outreach.join(", ")||"none"}.`;
+const cats=[...new Set(D.rows.map(r=>r.category))];$("fc").innerHTML="<option value=''>All categories</option>";
+cats.forEach(c=>{const o=document.createElement("option");o.textContent=c;$("fc").append(o)});
+function td(tr,t,cls){const c=document.createElement("td");c.textContent=t??"";if(cls)c.className=cls+" t";tr.append(c);return c}
+function draw(){const q=$("q").value.toLowerCase();$("rows").innerHTML="";
+D.rows.filter(r=>(!q||r.name.toLowerCase().includes(q))&&(!$("fc").value||r.category==$("fc").value)&&(!$("fa").value||r.access==$("fa").value)&&(!$("fv").value||r.verdict==$("fv").value)).forEach(r=>{
+const tr=document.createElement("tr");td(tr,r.name).title=r.what_it_does||"";td(tr,r.category);td(tr,(r.auth||[]).join(", "));
+td(tr,r.access,r.access);td(tr,r.api);td(tr,r.mcp);td(tr,r.verdict||"error",r.verdict);td(tr,r.blocker);
+const e=td(tr,"");(r.evidence||[]).slice(0,2).forEach((u,i)=>{if(/^https?:/.test(u)){const a=document.createElement("a");a.href=u;a.rel="noopener";a.textContent="["+(i+1)+"] ";e.append(a)}});
+td(tr,r.confidence);$("rows").append(tr)})}
+["q","fc","fa","fv"].forEach(i=>$(i).addEventListener("input",draw));draw();
+$("notes").textContent=D.notes||"Add your notes in notes.md (what you fixed by hand, which apps defeated the agent) and run analyze again.";
+if(D.accuracy){let h=`<p>Hand-checked sample: ${D.accuracy.n} apps against real docs. Agreement with the human answer:</p><div class="wrap"><table><tr><th>Field</th><th>First pass</th><th>After verify</th></tr>`;
+for(const[k,v]of Object.entries(D.accuracy.fields))h+=`<tr><td>${k}</td><td>${v.pass1}</td><td>${v.pass2}</td></tr>`;$("acc").innerHTML=h+"</table></div>";
+if(D.misses.length){const t=document.createElement("table");t.innerHTML="<tr><th>Miss</th><th>Field</th><th>Agent said</th><th>After verify</th><th>Docs say</th></tr>";
+D.misses.forEach(m=>{const tr=document.createElement("tr");[m.app,m.field,m.agent,m.after_verify,m.human].forEach(x=>td(tr,x));t.append(tr)});$("miss").append(t)}}
+else $("acc").textContent="No hand-checked sample yet. Run pipeline.py sample, fill the h_* columns, then run analyze."}
+</script></main></body></html>
